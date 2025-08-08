@@ -79,8 +79,9 @@ const GenerateTicket = () => {
     age: '',
     gender: '',
     doctorName: '',
+    doctorId: '',
     department: '',
-    amount: '',
+    consultationFee: '',
     temperature: '',
     bp: '',
   });
@@ -91,8 +92,9 @@ const GenerateTicket = () => {
     age: '',
     gender: '',
     doctorName: '',
+    doctorId: '',
     department: '',
-    amount: '',
+    consultationFee: '',
     temperature: '',
     bp: '',
   });
@@ -104,8 +106,24 @@ const GenerateTicket = () => {
   const [openResetDialog, setOpenResetDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
 
-  // Derive unique departments from doctors
-  const uniqueDepartments = [...new Set(doctors.map(doc => doc.department).filter(dept => dept))];
+  const fetchTickets = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/tickets');
+      setTickets(response.data);
+      const today = new Date();
+      const todayTickets = response.data.filter((ticket) => {
+        const ticketDate = new Date(ticket.createdAt);
+        return !isNaN(ticketDate) && ticketDate.toDateString() === today.toDateString();
+      });
+      setTicketNumber(todayTickets.length + 1 || 1); // Reset ticket number daily
+      const storedRef = localStorage.getItem('lastReferenceNumber');
+      setReferenceNumber(storedRef ? parseInt(storedRef) : 1);
+      console.log('Fetched tickets:', response.data); // Debug log
+    } catch (err) {
+      console.error('Error fetching tickets:', err);
+      setAlert({ type: 'error', message: 'Failed to fetch tickets.' });
+    }
+  };
 
   const fetchDoctors = async () => {
     try {
@@ -117,24 +135,6 @@ const GenerateTicket = () => {
     }
   };
 
-  const fetchTickets = async () => {
-    try {
-      const response = await axios.get('http://localhost:5000/api/tickets');
-      setTickets(response.data);
-      const today = new Date();
-      const todayTickets = response.data.filter((ticket) => {
-        const ticketDate = new Date(ticket.createdAt);
-        return !isNaN(ticketDate) && ticketDate.toDateString() === today.toDateString();
-      });
-      setTicketNumber(todayTickets.length + 1 || 1);
-      const storedRef = localStorage.getItem('lastReferenceNumber');
-      setReferenceNumber(storedRef ? parseInt(storedRef) : 1);
-    } catch (err) {
-      console.error('Error fetching tickets:', err);
-      setAlert({ type: 'error', message: 'Failed to fetch tickets.' });
-    }
-  };
-
   useEffect(() => {
     fetchTickets();
     fetchDoctors();
@@ -143,48 +143,64 @@ const GenerateTicket = () => {
   const handleNewTicketChange = (e) => {
     const { name, value } = e.target;
     if (name === 'doctorName') {
-      const selectedDoctor = doctors.find((doc) => doc.name === value);
+      const selectedDoctor = doctors.find((doc) => `${doc.name} (${doc.department})` === value);
       if (selectedDoctor) {
-        setNewTicketForm({
-          ...newTicketForm,
-          doctorName: value,
+        setNewTicketForm((prev) => ({
+          ...prev,
+          doctorName: selectedDoctor.name,
+          doctorId: selectedDoctor.id,
           department: selectedDoctor.department || '',
-          amount: selectedDoctor.consultationFee || '',
-        });
+          consultationFee: selectedDoctor.consultationFee || '',
+        }));
+        if (!selectedDoctor.department || !selectedDoctor.consultationFee) {
+          setAlert({
+            type: 'warning',
+            message: 'Selected doctor is missing department or consultation fee.',
+          });
+        }
       } else {
-        setNewTicketForm({
-          ...newTicketForm,
-          doctorName: value,
+        setNewTicketForm((prev) => ({
+          ...prev,
+          doctorName: '',
+          doctorId: '',
           department: '',
-          amount: '',
-        });
+          consultationFee: '',
+        }));
       }
     } else {
-      setNewTicketForm({ ...newTicketForm, [name]: value });
+      setNewTicketForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     if (name === 'doctorName') {
-      const selectedDoctor = doctors.find((doc) => doc.name === value);
+      const selectedDoctor = doctors.find((doc) => `${doc.name} (${doc.department})` === value);
       if (selectedDoctor) {
-        setEditForm({
-          ...editForm,
-          doctorName: value,
+        setEditForm((prev) => ({
+          ...prev,
+          doctorName: selectedDoctor.name,
+          doctorId: selectedDoctor.id,
           department: selectedDoctor.department || '',
-          amount: selectedDoctor.consultationFee || '',
-        });
+          consultationFee: selectedDoctor.consultationFee || '',
+        }));
+        if (!selectedDoctor.department || !selectedDoctor.consultationFee) {
+          setAlert({
+            type: 'warning',
+            message: 'Selected doctor is missing department or consultation fee.',
+          });
+        }
       } else {
-        setEditForm({
-          ...editForm,
-          doctorName: value,
+        setEditForm((prev) => ({
+          ...prev,
+          doctorName: '',
+          doctorId: '',
           department: '',
-          amount: '',
-        });
+          consultationFee: '',
+        }));
       }
     } else {
-      setEditForm({ ...editForm, [name]: value });
+      setEditForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
@@ -289,7 +305,6 @@ const GenerateTicket = () => {
             }
             .diagnosis {
               font-size: 13px;
-              display: flex;
               margin-bottom: 10px;
             }
             .diagnosis strong {
@@ -391,7 +406,7 @@ const GenerateTicket = () => {
               <div class="header-content">
                 <div class="hospital-name">AL-KARAM MEMORIAL HOSPITAL</div>
                 <div class="hospital-address">Opposite Gala mountain Wala, Mehudi Shah Road, Wazirabad</div>
-                <div class="hospital-contact">Phone #.055-6606800.Mobile # 0300-6283703</div>
+                <div class="hospital-contact">Phone #.055-6606800 | Mobile # 0300-6283703</div>
               </div>
             </div>
             <div class="header-line"></div>
@@ -404,13 +419,13 @@ const GenerateTicket = () => {
             </div>
             <div class="info">
               <p><strong>Patient Name:</strong> ${ticket.patientName}</p>
-              <p><strong>Gender:</strong>${ticket.gender}</p>
+              <p><strong>Gender:</strong> ${ticket.gender}</p>
               <p><strong>Age:</strong> ${ticket.age}</p>
               <p><strong>Phone Number:</strong> ${ticket.phoneNumber}</p>
               <p><strong>BP:</strong> ${ticket.bp || '--'}</p>
               <p><strong>Temp:</strong> ${ticket.temperature || '--'}&deg;C</p>
-              <p><strong>Rs:</strong> ${ticket.amount}</p>
-              <p><strong>Department:</strong>${ticket.department || ''}</p>
+              <p><strong>Fee:</strong> ${ticket.consultationFee}</p>
+              <p><strong>Department:</strong> ${ticket.department || ''}</p>
             </div>
             <div class="diagnosis">
               <strong>Diagnosis:</strong>
@@ -450,7 +465,7 @@ const GenerateTicket = () => {
             <div class="clinic-info">
               AL-KARAM MEMORIAL HOSPITAL &nbsp; | &nbsp; 
               Opposite Gala mountain Wala, Mehudi Shah Road, Wazirabad &nbsp; | &nbsp; 
-              Phone #.055-6606800.Mobile # 0300-6283703
+              Phone #.055-6606800 | Mobile # 0300-6283703
             </div>
           </div>
         </body>
@@ -470,8 +485,9 @@ const GenerateTicket = () => {
       age,
       gender,
       doctorName,
+      doctorId,
       department,
-      amount,
+      consultationFee,
       temperature,
       bp,
     } = newTicketForm;
@@ -482,8 +498,9 @@ const GenerateTicket = () => {
       !age ||
       !gender ||
       !doctorName ||
+      !doctorId ||
       !department ||
-      !amount ||
+      !consultationFee ||
       !temperature ||
       !bp
     ) {
@@ -497,8 +514,9 @@ const GenerateTicket = () => {
       age,
       gender,
       doctorName,
+      doctorId,
       department,
-      amount,
+      consultationFee,
       temperature,
       bp,
       ticketNumber,
@@ -506,17 +524,17 @@ const GenerateTicket = () => {
     };
 
     try {
-      const ticketResponse = await axios.post('http://192.168.1.7:5000/api/tickets', newTicket);
+      const ticketResponse = await axios.post('http://localhost:5000/api/tickets', newTicket);
       setAlert({ type: 'success', message: 'Ticket and patient registered!' });
-
       setNewTicketForm({
         patientName: '',
         phoneNumber: '',
         age: '',
         gender: '',
         doctorName: '',
+        doctorId: '',
         department: '',
-        amount: '',
+        consultationFee: '',
         temperature: '',
         bp: '',
       });
@@ -533,7 +551,7 @@ const GenerateTicket = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`http://192.168.1.7:5000/api/tickets/${id}`);
+      await axios.delete(`http://localhost:5000/api/tickets/${id}`);
       setAlert({ type: 'success', message: 'Ticket deleted successfully.' });
       fetchTickets();
     } catch (err) {
@@ -550,8 +568,9 @@ const GenerateTicket = () => {
       age: ticket.age,
       gender: ticket.gender,
       doctorName: ticket.doctorName,
+      doctorId: ticket.doctorId,
       department: ticket.department,
-      amount: ticket.amount, // Assuming ticket data has 'amount'
+      consultationFee: ticket.consultationFee,
       temperature: ticket.temperature,
       bp: ticket.bp,
     });
@@ -561,7 +580,7 @@ const GenerateTicket = () => {
   const handleUpdateTicket = async () => {
     if (editForm.id) {
       try {
-        await axios.put(`http://192.168.1.7:5000/api/tickets/${editForm.id}`, editForm);
+        await axios.put(`http://localhost:5000/api/tickets/${editForm.id}`, editForm);
         setAlert({ type: 'success', message: 'Ticket updated successfully!' });
         setOpenEditDialog(false);
         fetchTickets();
@@ -581,8 +600,9 @@ const GenerateTicket = () => {
       age: '',
       gender: '',
       doctorName: '',
+      doctorId: '',
       department: '',
-      amount: '',
+      consultationFee: '',
       temperature: '',
       bp: '',
     });
@@ -810,6 +830,10 @@ const GenerateTicket = () => {
                           fontWeight: 'medium',
                         },
                         '& .MuiSelect-select': {
+                          padding: '6px 8px',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          alignItems: 'center',
                           padding: '0.75rem !important',
                         },
                       }}
@@ -826,7 +850,7 @@ const GenerateTicket = () => {
                       select
                       label="Doctor"
                       name="doctorName"
-                      value={newTicketForm.doctorName}
+                      value={newTicketForm.doctorName ? `${newTicketForm.doctorName} (${doctors.find(doc => doc.id === newTicketForm.doctorId)?.department || ''})` : ''}
                       onChange={handleNewTicketChange}
                       fullWidth
                       variant="outlined"
@@ -843,27 +867,30 @@ const GenerateTicket = () => {
                           fontWeight: 'medium',
                         },
                         '& .MuiSelect-select': {
+                          padding: '6px 8px',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          alignItems: 'center',
                           padding: '0.75rem !important',
                         },
                       }}
                     >
                       {doctors.map((doc) => (
-                        <MenuItem key={doc.id} value={doc.name}>
-                          {doc.name}
+                        <MenuItem key={doc.id} value={`${doc.name} (${doc.department})`}>
+                          {`${doc.name} `}
                         </MenuItem>
                       ))}
                     </TextField>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12}>
                     <TextField
-                      select
                       label="Department"
                       name="department"
                       value={newTicketForm.department}
                       onChange={handleNewTicketChange}
                       fullWidth
                       variant="outlined"
-                      disabled={!!newTicketForm.doctorName}
+                      disabled
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: '12px',
@@ -876,27 +903,18 @@ const GenerateTicket = () => {
                           color: '#00bcd4',
                           fontWeight: 'medium',
                         },
-                        '& .MuiSelect-select': {
-                          padding: '0.75rem !important',
-                        },
                       }}
-                    >
-                      {uniqueDepartments.map((dept) => (
-                        <MenuItem key={dept} value={dept}>
-                          {dept}
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
-                      label="Amount"
-                      name="amount"
-                      value={newTicketForm.amount}
+                      label="Consultation Fee"
+                      name="consultationFee"
+                      value={newTicketForm.consultationFee}
                       onChange={handleNewTicketChange}
                       fullWidth
                       variant="outlined"
-                      disabled={!!newTicketForm.doctorName}
+                      disabled
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: '12px',
@@ -912,7 +930,7 @@ const GenerateTicket = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       label="Temperature (°C)"
                       name="temperature"
@@ -935,7 +953,7 @@ const GenerateTicket = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12} sm={4}>
                     <TextField
                       label="Blood Pressure"
                       name="bp"
@@ -1088,10 +1106,7 @@ const GenerateTicket = () => {
               </Box>
             </Fade>
           </Grid>
-        </Grid>
 
-        {/* Second Row: Yesterday's Tickets */}
-        <Grid container spacing={4} sx={{ maxWidth: '1400px', mx: 'auto', mt: 4 }}>
           <Grid item xs={12} md={12} sx={{ mx: 'auto' }}>
             <Fade in timeout={1200}>
               <Box
@@ -1189,282 +1204,266 @@ const GenerateTicket = () => {
               </Box>
             </Fade>
           </Grid>
-        </Grid>
 
-        <Snackbar
-          open={!!alert}
-          autoHideDuration={3000}
-          onClose={() => setAlert(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        >
-          {alert && (
-            <Alert
-              severity={alert.type}
-              sx={{
-                borderRadius: '12px',
-                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
-                bgcolor: alert.type === 'success' ? '#e0f7fa' : '#ffebee',
-                color: alert.type === 'success' ? '#00bcd4' : '#d32f2f',
-                fontWeight: 'medium',
-              }}
-            >
-              {alert.message}
-            </Alert>
-          )}
-        </Snackbar>
+          <Snackbar
+            open={!!alert}
+            autoHideDuration={3000}
+            onClose={() => setAlert(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          >
+            {alert && (
+              <Alert
+                severity={alert.type}
+                sx={{
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
+                  bgcolor: alert.type === 'success' ? '#e0f7fa' : alert.type === 'warning' ? '#fff3cd' : '#ffebee',
+                  color: alert.type === 'success' ? '#00bcd4' : alert.type === 'warning' ? '#856404' : '#d32f2f',
+                  fontWeight: 'medium',
+                }}
+              >
+                {alert.message}
+              </Alert>
+            )}
+          </Snackbar>
 
-        <Dialog
-          open={openResetDialog}
-          onClose={() => setOpenResetDialog(false)}
-          PaperProps={{
-            sx: {
-              borderRadius: '16px',
-              backdropFilter: 'blur(10px)',
-              bgcolor: 'rgba(255, 255, 255, 0.9)',
-            },
-          }}
-        >
-          <DialogTitle sx={{ color: '#00bcd4', fontWeight: 'bold' }}>
-            Reset Reference Number
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText sx={{ color: '#263238' }}>
-              Are you sure you want to reset the reference number to 1? This action cannot be undone.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() => setOpenResetDialog(false)}
-              sx={{
-                color: '#546e7a',
-                textTransform: 'none',
-                '&:hover': {
-                  bgcolor: 'rgba(0, 188, 212, 0.1)',
-                },
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleResetReference}
-              sx={{
-                color: '#ffffff',
-                bgcolor: '#00bcd4',
-                textTransform: 'none',
-                borderRadius: '8px',
-                '&:hover': {
-                  bgcolor: '#0097a7',
-                },
-              }}
-            >
-              Reset
-            </Button>
-          </DialogActions>
-        </Dialog>
+          <Dialog
+            open={openResetDialog}
+            onClose={() => setOpenResetDialog(false)}
+            PaperProps={{
+              sx: {
+                borderRadius: '16px',
+                backdropFilter: 'blur(10px)',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+              },
+            }}
+          >
+            <DialogTitle sx={{ color: '#00bcd4', fontWeight: 'bold' }}>
+              Reset Reference Number
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText sx={{ color: '#263238' }}>
+                Are you sure you want to reset the reference number to 1? This action cannot be undone.
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setOpenResetDialog(false)}
+                sx={{
+                  color: '#546e7a',
+                  textTransform: 'none',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 188, 212, 0.1)',
+                  },
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleResetReference}
+                sx={{
+                  color: '#ffffff',
+                  bgcolor: '#00bcd4',
+                  textTransform: 'none',
+                  borderRadius: '8px',
+                  '&:hover': {
+                    bgcolor: '#0097a7',
+                  },
+                }}
+              >
+                Reset
+              </Button>
+            </DialogActions>
+          </Dialog>
 
-        <Dialog
-          open={openEditDialog}
-          onClose={handleCloseEditDialog}
-          PaperProps={{
-            sx: {
-              borderRadius: '16px',
-              backdropFilter: 'blur(10px)',
-              bgcolor: 'rgba(255, 255, 255, 0.9)',
-            },
-          }}
-        >
-          <DialogTitle sx={{ color: '#00bcd4', fontWeight: 'bold' }}>
-            Edit Ticket
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText sx={{ color: '#263238', mb: 2 }}>
-              Update the ticket details below.
-            </DialogContentText>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <TextField
-                  label="Patient Name"
-                  name="patientName"
-                  value={editForm.patientName}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
+          <Dialog
+            open={openEditDialog}
+            onClose={handleCloseEditDialog}
+            PaperProps={{
+              sx: {
+                borderRadius: '16px',
+                backdropFilter: 'blur(10px)',
+                bgcolor: 'rgba(255, 255, 255, 0.9)',
+              },
+            }}
+          >
+            <DialogTitle sx={{ color: '#00bcd4', fontWeight: 'bold' }}>
+              Edit Ticket
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText sx={{ color: '#263238', mb: 2 }}>
+                Update the ticket details below.
+              </DialogContentText>
+              <Grid container spacing={3}>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Patient Name"
+                    name="patientName"
+                    value={editForm.patientName}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Phone Number"
+                    name="phoneNumber"
+                    value={editForm.phoneNumber}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    label="Age"
+                    name="age"
+                    value={editForm.age}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    label="Gender"
+                    name="gender"
+                    value={editForm.gender}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  >
+                    {genders.map((gender) => (
+                      <MenuItem key={gender} value={gender}>
+                        {gender}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    label="Doctor"
+                    name="doctorName"
+                    value={editForm.doctorName ? `${editForm.doctorName} (${doctors.find(doc => doc.id === editForm.doctorId)?.department || ''})` : ''}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  >
+                    {doctors.map((doc) => (
+                      <MenuItem key={doc.id} value={`${doc.name} (${doc.department})`}>
+                        {`${doc.name} (${doc.department})`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    label="Department"
+                    name="department"
+                    value={editForm.department}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    disabled
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    label="Consultation Fee"
+                    name="consultationFee"
+                    value={editForm.consultationFee}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    disabled
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    label="Temperature (°C)"
+                    name="temperature"
+                    value={editForm.temperature}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    label="Blood Pressure"
+                    name="bp"
+                    value={editForm.bp}
+                    onChange={handleEditChange}
+                    fullWidth
+                    variant="outlined"
+                    sx={{
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                      '& .MuiInputLabel-root': { color: '#00bcd4' },
+                    }}
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Phone Number"
-                  name="phoneNumber"
-                  value={editForm.phoneNumber}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Age"
-                  name="age"
-                  value={editForm.age}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  label="Gender"
-                  name="gender"
-                  value={editForm.gender}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                    '& .MuiSelect-select': {
-                      padding: '0.75rem !important',
-                    },
-                  }}
-                >
-                  {genders.map((gender) => (
-                    <MenuItem key={gender} value={gender}>
-                      {gender}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  label="Doctor"
-                  name="doctorName"
-                  value={editForm.doctorName}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                    '& .MuiSelect-select': {
-                      padding: '0.75rem !important',
-                    },
-                  }}
-                >
-                  {doctors.map((doc) => (
-                    <MenuItem key={doc.id} value={doc.name}>
-                      {doc.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  select
-                  label="Department"
-                  name="department"
-                  value={editForm.department}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  disabled={!!editForm.doctorName}
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                    '& .MuiSelect-select': {
-                      padding: '0.75rem !important',
-                    },
-                  }}
-                >
-                  {uniqueDepartments.map((dept) => (
-                    <MenuItem key={dept} value={dept}>
-                      {dept}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Amount"
-                  name="amount"
-                  value={editForm.amount}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  disabled={!!editForm.doctorName}
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Temperature (°C)"
-                  name="temperature"
-                  value={editForm.temperature}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Blood Pressure"
-                  name="bp"
-                  value={editForm.bp}
-                  onChange={handleEditChange}
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    '& .MuiOutlinedInput-root': { borderRadius: '12px' },
-                    '& .MuiInputLabel-root': { color: '#00bcd4' },
-                  }}
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={handleCloseEditDialog}
-              sx={{ color: '#546e7a', textTransform: 'none' }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpdateTicket}
-              sx={{
-                color: '#ffffff',
-                bgcolor: '#00bcd4',
-                textTransform: 'none',
-                borderRadius: '8px',
-                '&:hover': { bgcolor: '#0097a7' },
-              }}
-            >
-              Save Changes
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    </DashboardLayout>
-  );
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={handleCloseEditDialog}
+                sx={{ color: '#546e7a', textTransform: 'none' }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateTicket}
+                sx={{
+                  color: '#ffffff',
+                  bgcolor: '#00bcd4',
+                  textTransform: 'none',
+                  borderRadius: '8px',
+                  '&:hover': { bgcolor: '#0097a7' },
+                }}
+              >
+                Save Changes
+              </Button>
+            </DialogActions>
+          </Dialog>
+          </Grid>
+        </Box>
+      </DashboardLayout>
+    );
 };
 
 export default GenerateTicket;

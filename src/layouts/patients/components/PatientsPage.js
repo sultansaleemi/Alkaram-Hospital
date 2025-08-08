@@ -50,7 +50,7 @@ const PatientsPage = () => {
   const fetchTicketsByPatientId = async (patientId) => {
     setModalLoading(true);
     try {
-      const response = await axios.get('http://192.168.1.7:5000/api/tickets', {
+      const response = await axios.get('http://localhost:5000/api/tickets', {
         params: { patientId },
       });
       return response.data;

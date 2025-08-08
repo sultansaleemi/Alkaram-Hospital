@@ -69,10 +69,10 @@ const TodayTicketCard = ({ ticket, onDelete, onPrint, onEdit, userRole }) => {
             &#x1F9A7; Doctor: {ticket.doctorName || "N/A"}
           </Typography>
           <Typography variant="body2">
-            &#x1F4AC; Reason: {ticket.reason || "N/A"}
+            &#x1F4AC; Department: {ticket.department || "N/A"}
           </Typography>
           <Typography variant="body2">
-            &#x1F4B0; Amount: Rs. {ticket.amount || "N/A"}
+            &#x1F4B0; Consultation Fee: Rs. {ticket.consultationFee || "N/A"}
           </Typography>
           <Typography variant="body2">
             &#x1F321; Temp: {ticket.temperature || "N/A"}&deg;C
@@ -170,14 +170,15 @@ TodayTicketCard.propTypes = {
     referenceNumber: PropTypes.string.isRequired,
     patientName: PropTypes.string.isRequired,
     doctorName: PropTypes.string.isRequired,
-    reason: PropTypes.string.isRequired,
-    amount: PropTypes.string.isRequired,
+    department: PropTypes.string.isRequired,
+    consultationFee: PropTypes.string.isRequired,
     temperature: PropTypes.string.isRequired,
     bp: PropTypes.string.isRequired,
     age: PropTypes.string.isRequired,
     gender: PropTypes.string.isRequired,
     phoneNumber: PropTypes.string.isRequired,
     createdAt: PropTypes.string.isRequired,
+    doctorId: PropTypes.number, // Added for compatibility, optional
   }),
   onDelete: PropTypes.func.isRequired,
   onPrint: PropTypes.func.isRequired,
